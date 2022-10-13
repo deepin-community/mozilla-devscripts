@@ -1,0 +1,5 @@
+xpi:Depends=iceweasel (>= 4.0) | firefox (>= 4.0) | firefox-esr (>= 4.0) | thunderbird (>= 5.0) | icedove (>= 5.0)
+xpi:Recommends=
+xpi:Breaks=firefox (<< 4.0), firefox-esr (<< 4.0), icedove (<< 5.0), iceweasel (<< 4.0), thunderbird (<< 5.0)
+xpi:Enhances=firefox, firefox-esr, icedove, iceweasel, thunderbird
+xpi:Provides=firefox-esr-test-package, firefox-test-package, icedove-test-package, iceweasel-test-package, test-package, thunderbird-test-package

@@ -1,0 +1,64 @@
+.\" Copyright (c) 2014 Ximin Luo <infinity0@pwned.gg>
+.\"
+.\" Permission to use, copy, modify, and/or distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.TH AMO-CHANGELOG "1" "December 2014" "amo-changelog" "mozilla-devscripts suite"
+.SH NAME
+amo-changelog \- fetch Version History of an addon
+.SH SYNOPSIS
+.B amo-changelog
+[\fIoptions\fP]
+\fIextension\fR
+.SH DESCRIPTION
+.B amo-changelog
+fetches the Version History of an addon from the Mozilla Extensions website.
+It is meant to offer an easy way to include upstream changelogs in Debian
+packages of mozilla extensions - in many cases, this is not contained in the
+upstream source code repository, but is available on said website.
+
+The \fIextension\fR argument is its short name, as used by the website. For
+example, the homepage for "Adblock Plus" is
+https://addons.mozilla.org/en-US/firefox/addon/adblock-plus/, so the
+short name would be "adblock-plus".
+
+Here is an example for debian/rules:
+
+# if using debhelper
+.br
+override_dh_installchangelogs:
+.br
+	dh_installchangelogs debian/upstream/changelog.html debian/upstream/changelog
+
+\[char46]PHONY: get-orig-changelog
+.br
+get-orig-changelog:
+.br
+	amo-changelog -p rst adblock-plus
+
+Using this approach, one would save the output files debian/upstream/{changelog.html,changelog}
+as part of the Debian packaging. When updating the package with a new upstream
+release, one would run `debian/rules get-orig-changelog`
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Display a brief help message.
+.TP
+\fB\-f\fR, \fB\-\-html\-file\fR
+File to write to. Default: debian/upstream/changelog.html
+.TP
+\fB\-p\fR, \fB\-\-plain\-format\fR
+Generate a human-readable form of the changelog in the file without the .html
+extension, using an external program. Possible options are text (uses lynx(1)),
+markdown (pandoc(1)), or rst (pandoc(1)). Default: none.
+.SH AUTHOR
+Jakub Wilk <jwilk@debian.org> and Ximin Luo <infinity0@pwned.gg>

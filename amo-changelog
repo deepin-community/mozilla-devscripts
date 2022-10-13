@@ -1,0 +1,165 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2014, Jakub Wilk <jwilk@debian.org>
+# Copyright (c) 2014, Ximin Luo <infinity0@pwned.gg>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+import argparse
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib
+import xml.etree.cElementTree as etree
+
+URL_TEMPLATE = "https://addons.mozilla.org/en-US/addon/{ext}/versions/format:rss"
+OUTGOING_HREF = re.compile(r'href="https?://outgoing.*?moz.*?/v\d+/\w+/(.+?)"')
+HTML_HEAD = "<html>\n<head><title>{title}</title></head>\n<body>\n"
+HTML_FOOT = "</body>\n</html>"
+
+
+def fix_outgoing_href(match):
+    return 'href="%s"' % urllib.parse.unquote(match.group(1))
+
+
+def convert_rss_to_html(first, source, target):
+    elements = etree.iterparse(source)
+    next_url = None
+    # header if first page
+    if first:
+        element = next(elements)[1]
+        while element.tag != "title":
+            element = next(elements)[1]
+        print(HTML_HEAD.format(title=element.text), file=target)
+    # items, rel
+    for _, element in elements:
+        if element.tag == "{http://www.w3.org/2005/Atom}link":
+            if element.attrib["rel"] == "next":
+                next_url = element.attrib["href"]
+            continue
+        if element.tag != "item":
+            continue
+        title = element.find("title").text.encode("utf-8")
+        print("<h2>%s</h2>" % title, file=target)
+        descel = element.find("description")
+        if descel is not None and descel.text:
+            desc = descel.text.rstrip("\n").encode("utf-8")
+            # process manual line breaks, e.g. adblock-plus
+            desc = desc.replace("\n", "\n<br/>").replace("<br/>\n", "<br/>&nbsp;\n")
+            # strip outgoing redirect
+            desc = OUTGOING_HREF.sub(fix_outgoing_href, desc)
+            print(desc, file=target)
+        else:
+            print("[no description]", file=target)
+        print("", file=target)
+    # footer if last page
+    if not next_url:
+        print(HTML_FOOT, file=target)
+    return next_url
+
+
+def try_external_write(out, args, **kwargs):
+    prog = args[0]
+    if not shutil.which(prog):
+        print("failed to write %s: program not found: %s" % (out, prog), file=sys.stderr)
+        return False
+    try:
+        subprocess.check_call(args, **kwargs)
+        print("wrote %s" % out, file=sys.stderr)
+        return True
+    except Exception as error:
+        print("failed to write %s: %s" % (out, error), file=sys.stderr)
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fetch Version History of an addon from the Mozilla "
+                    "Extensions website and convert it into a human-readable format.")
+    parser.add_argument("extension",
+                        help="Extension short-name, as used on addons.mozilla.org.")
+    parser.add_argument("-f", "--html-file",
+                        metavar="FILE", default="debian/upstream/changelog.html",
+                        help="File to write to. Default: %(default)s.")
+    parser.add_argument("-p", "--plain-format", metavar="FORMAT",
+                        choices=["text", "markdown", "rst"], default="none",
+                        help="Generate a human-readable form of the changelog in the file "
+                             "without the .html extension, using an external program. Possible "
+                             "options are text (uses lynx(1)), markdown (pandoc(1)), or rst "
+                             "(pandoc(1)). Default: %(default)s.")
+    options = parser.parse_args()
+
+    progname = os.path.basename(sys.argv[0])
+
+    html_file = options.html_file
+    if not html_file.endswith(".html"):
+        print("%s: Output filename must end with .html: %s" %
+              (progname, html_file), file=sys.stderr)
+        return 1
+    plain_file = html_file[:-5]
+
+    try:
+        with open(html_file, "w") as target:
+            url = URL_TEMPLATE.format(ext=options.extension)
+            first = True
+            while url:
+                try:
+                    source = urllib.request.urlopen(url)
+                except urllib.error.HTTPError as error:
+                    print("%s: For extension '%s', error fetching '%s': %s" %
+                          (progname, options.extension, url, error), file=sys.stderr)
+                    raise
+                try:
+                    url = convert_rss_to_html(first, source, target)
+                    first = False
+                finally:
+                    source.close()
+        print("wrote %s" % html_file, file=sys.stderr)
+    except Exception as error:
+        print("failed to write %s: %s" % (html_file, error), file=sys.stderr)
+        # os.remove(html_file)
+        return 1
+
+    if options.plain_format == "text":
+        with open(plain_file, "w") as target:
+            cmd = ["lynx", "-dump", "-list_inline", "-width=84", html_file]
+            if not try_external_write(plain_file, cmd, stdout=target):
+                # os.remove(plain_file)
+                return 1
+
+            # 2 space indent is a bit more reasonable than lynx's 3 default
+            # width=84 above (3*2-2) effectively cancels the right margin
+            subprocess.call(["sed", "-i", "-e", "s/^   /  /g", plain_file])
+
+    elif options.plain_format == "markdown":
+        cmd = ["pandoc", "-i", html_file, "--columns=79", "-wmarkdown", "-o", plain_file]
+        if not try_external_write(plain_file, cmd):
+            return 1
+
+    elif options.plain_format == "rst":
+        cmd = ["pandoc", "-i", html_file, "--columns=79", "-wrst", "-o", plain_file]
+        if not try_external_write(plain_file, cmd):
+            return 1
+
+        # work around https://github.com/jgm/pandoc/issues/1656
+        # by adding two spaces to all line-block continuation lines
+        subprocess.call(["sed", "-i", "-r",
+                         "-e", r"/^\|/,/^ |^$/{s/^([^ |])/  \1/g}", plain_file])
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

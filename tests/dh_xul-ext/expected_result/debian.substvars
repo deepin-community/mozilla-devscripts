@@ -1,0 +1,5 @@
+xpi:Depends=iceweasel (>= 3.5) | firefox (>= 3.5) | firefox-esr (>= 3.5) | thunderbird (>= 3.0) | icedove (>= 3.0) | conkeror | iceowl
+xpi:Recommends=
+xpi:Breaks=conkeror (>> 100.+), firefox (<< 3.5), firefox (>> 7.0~a0), firefox-esr (<< 3.5), firefox-esr (>> 7.0~a0), icedove (<< 3.0), icedove (>> 7.0~a1+), iceowl (>> 1.9+), iceweasel (<< 3.5), iceweasel (>> 7.0~a0), thunderbird (<< 3.0), thunderbird (>> 7.0~a1+)
+xpi:Enhances=conkeror, firefox, firefox-esr, icedove, iceowl, iceweasel, thunderbird
+xpi:Provides=conkeror-test-package, firefox-esr-test-package, firefox-test-package, icedove-test-package, iceowl-test-package, iceweasel-test-package, test-package, thunderbird-test-package

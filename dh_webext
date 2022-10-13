@@ -1,0 +1,228 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2017, Ximin Luo <infinity0@debian.org>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+'''
+TODO, from DebConf 2018 WebExt packaging BoF:
+
+- Guide for maintainers to define transitional packages from old xul-ext stuff
+  - wiki.d.o/RenamingPackages
+  - see adblock-plus git history for an example
+  - done in d/control so we can't really automate it in dh_webext but at least
+    we can give a central documentation for packagers to do it
+- better documentation, e.g. syntax for the debian/install-webext file
+
+Other stuff:
+- chase up https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=890392
+  - if chromium maintainer doesn't co-operate, alternative is to add
+    that file to a webext-common package and depend on it for every webext
+'''
+
+import argparse
+import json
+import logging
+import os
+import shlex
+import subprocess
+import sys
+import time
+
+__script_name__ = "dh_webext" if __name__ == '__main__' else __name__
+
+APP_PACKAGES_DEBIAN = {
+    "gecko": ["firefox", "firefox-esr"],
+    "chromium": ["chromium"],
+    # https://bugzilla.mozilla.org/show_bug.cgi?id=1396172
+    # The patch https://bugzilla.mozilla.org/attachment.cgi?id=8918600
+    # seems to use "thunderbird" rather than "gecko". not sure if my reading
+    # is correct, someone should follow up on the bug report
+    "thunderbird": ["thunderbird"],
+}
+
+APP_EXTENSION_PATHS = {
+    "gecko": [
+        "/usr/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}",
+    ],
+    "thunderbird": [
+        "/usr/share/mozilla/extensions/{3550f703-e582-4d05-9a08-453d09bdfdc6}",
+    ],
+    "chromium": ["/usr/share/chromium/extensions"],
+}
+
+
+def run(cmdline):
+    logger = logging.getLogger(__script_name__)
+    if logger.isEnabledFor(logging.INFO):
+        print("  ", " ".join(shlex.quote(a) for a in cmdline))
+    subprocess.check_call(cmdline)
+
+
+def get_all_packages():
+    with open("debian/control", encoding="utf-8") as fp:
+        lines = fp.readlines()
+    package_lines = [x for x in lines if x.find("Package:") >= 0]
+    packages = [p[p.find(":")+1:].strip() for p in package_lines]
+    packages = [p for p in packages if p.startswith("webext-")]
+    if not packages:
+        print("dh_webext: warning: no webext-* packages detected, no substvars " +
+              "will be generated. THIS IS PROBABLY NOT WHAT YOU WANT.", file=sys.stderr)
+    return packages
+
+
+def generate_substvars(package, name, supported):
+    ext_name = name
+    for prefix in ("webext-",):
+        if ext_name.startswith(prefix):
+            ext_name = ext_name[len(prefix):]
+
+    filename = "debian/%s.substvars" % package
+    # TODO: read old file and merge the new values in
+
+    debian_apps = {deb: minversion
+                   for app, minversion in supported.items()
+                   for deb in APP_PACKAGES_DEBIAN[app]}
+
+    own_version = (subprocess.check_output(["dpkg-parsechangelog", "-SVersion"])
+                   .decode("utf-8").strip())
+
+    def depends(k, v):
+        return "%s (>= %s~~)" % (k, v) if v is not None else k
+    # breaks = lambda k, v: "%s (<< %s~~)" % (k, v)
+    meta = {
+        "recommends": [" | ".join(sorted(depends(k, v) for k, v in debian_apps.items()))],
+        # "breaks": sorted(breaks(k, v) for k, v in debian_apps.items() if v),
+        "enhances": sorted(debian_apps.keys()),
+        "provides": ["%s-%s (= %s)" % (prefix, ext_name, own_version) for prefix in debian_apps],
+    }
+
+    lines = [
+        ("webext:%s=" % k.capitalize() + ", ".join(v) + "\n") for k, v in meta.items()
+    ]
+    with open(filename, 'w+', encoding="utf-8") as fp:
+        fp.writelines(lines)
+
+
+def install_for_app(extname, appname, appextname):
+    for p in APP_EXTENSION_PATHS[appname]:
+        run(["dh_link", "/usr/share/webext/%s" % extname, os.path.join(p, appextname)])
+
+
+def install_webext(*args):
+    parser = argparse.ArgumentParser(
+        description="Debhelper command to install an unpacked WebExtension")
+    parser.add_argument(
+        "-p", "--package", dest="packages", metavar="PACKAGE", action="append", default=[],
+        help='Act on the specified binary PACKAGE(s). Default: all packages '
+        'that start with the "webext-" prefix.')
+    parser.add_argument(
+        "-I", "--dh-install-arg", dest="dh_install_args", metavar="ARG", action="append",
+        default=[], help="extra arguments to pass to dh_install")
+    parser.add_argument(
+        "-v", "--verbose", action="store_const", dest="log_level", default=logging.WARNING,
+        const=logging.INFO, help="print more information")
+    parser.add_argument(
+        'home', metavar='PATH', nargs='?', default=None,
+        help='Path to the source directory to install. Default: search the '
+        'source tree for manifest.json and use its parent directory. If there '
+        'is more than one, we fall back to "." if "./manifest.json" exists')
+    parser.add_argument(
+        'name', metavar='NAME', nargs='?', default=None,
+        help='Short name of the extension. PATH will be installed into '
+        '/usr/share/webext/<PATH>. Default: Guess from the first PACKAGE in '
+        'our list of PACKAGE(s), by stripping off the "webext-" prefix.')
+    # TODO: need to handle/ignore other debhelper options, see dh_xul-ext
+    # for an example and `man debhelper` "COMMON DEBHELPER OPTIONS" for full list
+    # TODO: import any useful options like -x from install-xpi
+    args, unknown = parser.parse_known_args(args)
+    logging.basicConfig(format='%(name)s: %(message)s', level=args.log_level)
+    logger = logging.getLogger(__script_name__)
+    if unknown:
+        logger.warning("Ignored some command-line arguments: %r", unknown)
+    packages = args.packages or get_all_packages()
+
+    home = args.home
+    name = args.name
+
+    # Autodetect directory to install
+    if args.home is None:
+        candidates = subprocess.check_output(
+            ["find", ".", "-name", "manifest.json", "-not", "-path", './debian/*'])
+        candidates = [x.strip() for x in candidates.decode("utf-8").splitlines() if x.strip()]
+        if len(candidates) == 1:
+            home = os.path.dirname(candidates[0])
+            logger.warning("Found 1 manifest.json, source PATH set to %s", home)
+        else:
+            home = "."
+            logger.warning("Found != 1 manifest.json, source PATH set to .")
+
+    manifest = os.path.join(home, "manifest.json")
+    if not os.path.exists(manifest):
+        raise ValueError("does not exist: %s" % manifest)
+
+    # reproducible timestamp, see https://reproducible-builds.org/specs/source-date-epoch/
+    build_date = int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))
+    # touch the manifest, firefox needs this to reload its extension cache
+    os.utime(manifest, (build_date, build_date))
+
+    with open(manifest, encoding="utf-8") as fp:
+        manifest = json.load(fp)
+
+        if name is None:
+            if packages[0].startswith("webext-"):
+                name = packages[0][7:]
+                logger.warning("Set NAME to %s from package %s", name, packages[0])
+            else:
+                name = manifest["name"]
+                logger.warning('Set NAME to %s from manifest.json "name" field', name)
+                if name.startswith("_"):
+                    raise ValueError("name in manifest.json starts with _, "
+                                     "please give actual name to %s" % __script_name__)
+
+        run(["dh_install", "-X.git", "-X.pc", "-Xdebian"] + args.dh_install_args +
+            [home, "usr/share/webext/%s" % name])
+
+        supported = {}
+
+        for appname, details in list(manifest["applications"].items()):
+            if appname in APP_EXTENSION_PATHS:
+                install_for_app(name, appname, details["id"])
+                supported[appname] = details.get("strict_min_version",
+                                                 "57" if appname == "gecko" else None)
+            else:
+                logger.warning("unrecognised application in manifest: %s", appname)
+
+        if "minimum_chrome_version" in manifest:
+            install_for_app(name, "chromium", name)
+            supported["chromium"] = manifest["minimum_chrome_version"]
+
+        if os.path.exists("debian/install-webext"):
+            with open("debian/install-webext", encoding="utf-8") as install_fp:
+                for line in install_fp.readlines():
+                    line = line.rstrip("\n")
+                    if " " in line:
+                        appname, extid = line.split(" ")
+                    else:
+                        appname, extid = line, name
+                    install_for_app(name, appname, extid)
+
+        for package in packages:
+            generate_substvars(package, name, supported)
+
+        return 0
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(install_webext(*sys.argv[1:]))
