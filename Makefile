@@ -5,7 +5,7 @@ test:
 	tests/test-moz-version
 
 install:
-	python2 setup.py install --root="$(DESTDIR)" --no-compile --install-layout=deb
+	python3 setup.py install --root="$(DESTDIR)" --no-compile --install-layout=deb
 
 clean:
 	rm -rf build *.pyc

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 import glob
 import os
@@ -20,28 +20,24 @@ def get_debian_version():
 
 
 SCRIPTS = [
-    'dh_xul-ext',
-    'install-xpi',
-    'xpi-pack',
-    'xpi-unpack',
-    'moz-version',
-]
-
-# need to treat these separately, else setuptools fucks with the shebang lines
-PY3_SCRIPTS = [
     'amo-changelog',
     'dh_webext',
+    'dh_xul-ext',
+    'install-xpi',
+    'moz-version',
+    'xpi-pack',
     'xpi-repack',
+    'xpi-unpack',
 ]
+
 
 if __name__ == '__main__':
     setup(
         name='mozilla-devscripts',
         version=get_debian_version(),
-        scripts=SCRIPTS,
         py_modules=['moz_version'],
         data_files=[
-            ('bin', PY3_SCRIPTS),
+            ('bin', SCRIPTS),
             ('share/doc/mozilla-devscripts', ['README']),
             ('share/man/man1', glob.glob("man/*.1")),
             ('share/mozilla-devscripts', ['data/xpi.mk'] + glob.glob('data/xul-app-data.csv.*')),

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright (c) 2009-2012, Benjamin Drung <bdrung@debian.org>
 #
@@ -25,6 +25,7 @@ import RDF
 
 from moz_version import (compare_versions, convert_moz_to_debian_version,
                          moz_to_next_debian_version)
+from functools import reduce
 
 _VENDOR_ENV = "DH_XUL_EXT_VENDOR"
 # error codes
@@ -161,8 +162,8 @@ def get_xul_apps(script_name, all_distros):
     else:
         csv_filename = os.path.join(data_dir, "xul-app-data.csv." + vendor)
         if not os.path.isfile(csv_filename):
-            print >> sys.stderr, ('%s: Unknown vendor "%s" specified.' %
-                                  (script_name, vendor))
+            print('%s: Unknown vendor "%s" specified.' %
+                                  (script_name, vendor), file=sys.stderr)
             sys.exit(1)
         csv_filenames = [csv_filename]
 
@@ -217,7 +218,7 @@ def _get_id_max_min_triple(script_name, package, install_rdf):
                    "from install.xpi." %
                    (script_name, package, appid, script_name, min_version,
                     max_version, script_name))
-            print >> sys.stderr, msg
+            print(msg, file=sys.stderr)
             failures += 1
     if failures > 0:
         sys.exit(INVALID_VERSION_RANGE)
@@ -229,10 +230,10 @@ def get_supported_apps(script_name, xul_apps, install_rdf, package,
                        verbose=False):
     id_max_min = _get_id_max_min_triple(script_name, package, install_rdf)
     if verbose:
-        print "%s: %s supports %i XUL application(s):" % (script_name, package,
-                                                          len(id_max_min))
+        print("%s: %s supports %i XUL application(s):" % (script_name, package,
+                                                          len(id_max_min)))
         for (appid, max_version, min_version) in id_max_min:
-            print "%s %s to %s" % (appid, min_version, max_version)
+            print("%s %s to %s" % (appid, min_version, max_version))
 
     # find supported apps/packages
     supported_apps = list()
@@ -247,18 +248,18 @@ def get_supported_apps(script_name, xul_apps, install_rdf, package,
                     xul_app.set_max_version(max_version)
                     supported_apps.append(xul_app)
                     if verbose:
-                        print "%s: %s supports %s." % (script_name, package,
-                                                       xul_app.get_package())
+                        print("%s: %s supports %s." % (script_name, package,
+                                                       xul_app.get_package()))
                 elif verbose:
-                    print "%s: %s does not support %s (any more)." % \
-                          (script_name, package, xul_app.get_package())
+                    print("%s: %s does not support %s (any more)." % \
+                          (script_name, package, xul_app.get_package()))
             elif verbose:
-                print "%s: %s does not support %s (yet)." % \
-                      (script_name, package, xul_app.get_package())
+                print("%s: %s does not support %s (yet)." % \
+                      (script_name, package, xul_app.get_package()))
         elif len(supported_app) > 1:
-            print ("%s: Found error in %s. There are multiple entries for "
-                   "application ID %s.") % (script_name, install_rdf,
-                                            xul_app.get_id())
+            print("%s: Found error in %s. There are multiple entries for "
+                   "application ID %s." % (script_name, install_rdf,
+                                            xul_app.get_id()))
 
     return supported_apps
 
@@ -306,7 +307,7 @@ def get_provided_package_names(package, supported_apps):
 
     for xul_app in supported_apps:
         app = xul_app.get_package()
-        for i in xrange(len(app) - 1, -1, -1):
+        for i in range(len(app) - 1, -1, -1):
             if app[i] == '-':
                 app = app[:i]
             elif not app[i].isdigit() and not app[i] == '.':
@@ -342,11 +343,11 @@ def generate_substvars(script_name, xul_apps, package, verbose=False):
                   " does not contain a XUL extension (no install.rdf found).")
         return
     elif len(install_rdfs) > 1:
-        print >> sys.stderr, ("%s: %s contains multiple install.rdf files. "
-                              "That's not supported.") % (script_name, package)
+        print("%s: %s contains multiple install.rdf files. "
+                              "That's not supported." % (script_name, package), file=sys.stderr)
         basepath_len = len(os.path.realpath("debian/" + package))
         rdfs = [x[basepath_len:] for x in install_rdfs]
-        print >> sys.stderr, "\n".join(rdfs)
+        print("\n".join(rdfs), file=sys.stderr)
         sys.exit(MULTIPLE_INSTALL_RDFS)
     install_rdf = install_rdfs.pop()
 
@@ -366,8 +367,8 @@ def generate_substvars(script_name, xul_apps, package, verbose=False):
     packages = [a.get_versioned_package() for a in supported_apps]
     if has_no_xpi_depends():
         # Use xpi:Recommends instead of xpi:Depends for backwards compatibility
-        print ("%s: Warning: Please add ${xpi:Depends} to Depends. Using only "
-               "${xpi:Recommends} is deprecated.") % (script_name)
+        print("%s: Warning: Please add ${xpi:Depends} to Depends. Using only "
+               "${xpi:Recommends} is deprecated." % (script_name))
         lines.append("xpi:Recommends=" + " | ".join(packages) + "\n")
     else:
         lines.append("xpi:Depends=" + " | ".join(packages) + "\n")
@@ -429,13 +430,13 @@ def main():
         for unknown_option in parser.unknown_options:
             sys.stderr.write("%s: warning: no such option: %s\n" %
                              (script_name, unknown_option))
-        print script_name + ": packages:", ", ".join(options.packages)
+        print(script_name + ": packages:", ", ".join(options.packages))
 
     xul_apps = get_xul_apps(script_name, options.all)
     if options.verbose and xul_apps:
-        print script_name + ": found %i Xul applications:" % (len(xul_apps))
+        print(script_name + ": found %i Xul applications:" % (len(xul_apps)))
         for xul_app in xul_apps:
-            print xul_app
+            print(xul_app)
 
     for package in options.packages:
         generate_substvars(script_name, xul_apps, package, options.verbose)

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright (c) 2010 Benjamin Drung <bdrung@debian.org>
 #
@@ -62,7 +62,7 @@ TEST_PATTERN = (
 
 
 def fail(message):
-    print >> sys.stderr, "E: " + message
+    print("E: " + message, file=sys.stderr)
     sys.exit(TEST_FAILED_ERROR)
 
 
@@ -91,7 +91,7 @@ def main():
         opts = getopt.gnu_getopt(sys.argv[1:], "v", long_opts)[0]
     except getopt.GetoptError as error:
         # print help information and exit:
-        print >> sys.stderr, str(error)
+        print(error, file=sys.stderr)
         sys.exit(COMMAND_LINE_SYNTAX_ERROR)
 
     verbose = False
