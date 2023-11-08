@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright (c) 2009-2013, Benjamin Drung <bdrung@debian.org>
 #
@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from __future__ import print_function
+
 
 import csv
 import optparse
@@ -107,7 +107,7 @@ def get_arch(package, debian_directory):
 def get_mode(filename):
     statinfo = os.stat(filename)
     mode = statinfo[stat.ST_MODE]
-    return mode & 0777
+    return mode & 0o777
 
 
 def get_xul_apps():
@@ -169,22 +169,22 @@ def install_xpi(script_name, package, xpi_file, exclude, install_dir, links,
             filename = os.path.join(copy_dir, name)
             if os.path.exists(filename):
                 mode = get_mode(filename)
-                if os.path.isdir(filename) and mode != 0755:
+                if os.path.isdir(filename) and mode != 0o755:
                     print("%s: correct permission from %s to %s of %s" %
-                          (script_name, oct(mode), oct(0755), name))
-                    os.chmod(filename, 0755)
+                          (script_name, oct(mode), oct(0o755), name))
+                    os.chmod(filename, 0o755)
                 elif os.path.isfile(filename):
-                    header = open(filename, "r").read(2)
-                    if header != "#!" and mode != 0644:
+                    header = open(filename, "rb").read(2)
+                    if header != "#!" and mode != 0o644:
                         # file without shebang
                         print("%s: correct permission from %s to %s of %s" %
-                              (script_name, oct(mode), oct(0644), name))
-                        os.chmod(filename, 0644)
-                    elif header == "#!" and mode != 0755:
+                              (script_name, oct(mode), oct(0o644), name))
+                        os.chmod(filename, 0o644)
+                    elif header == "#!" and mode != 0o755:
                         # file with shebang
                         print("%s: correct permission from %s to %s of %s" %
-                              (script_name, oct(mode), oct(0755), name))
-                        os.chmod(filename, 0755)
+                              (script_name, oct(mode), oct(0o755), name))
+                        os.chmod(filename, 0o755)
 
     # create a system preference file in /etc
     if system_prefs:

@@ -5,22 +5,20 @@ Maintainer: Debian Mozilla Extension Maintainers <pkg-mozext-maintainers@lists.a
 Uploaders: Benjamin Drung <bdrung@debian.org>
 Build-Depends: debhelper-compat (= 12),
                dh-python,
-               python-all (>= 2.6.6-3~),
-               python-librdf (>= 1.0.17.1+dfsg-1.4),
-               python3
+               python3,
+               python3-librdf,
 Standards-Version: 4.4.1
 VCS-Browser: https://salsa.debian.org/webext-team/webext-devscripts
 VCS-Git: https://salsa.debian.org/webext-team/webext-devscripts.git
 
 Package: mozilla-devscripts
 Architecture: all
-Depends: python-librdf,
+Depends: python3-librdf,
          unzip,
          zip,
          ${misc:Depends},
          ${perl:Depends},
          ${python3:Depends},
-         ${python:Depends}
 Description: Development scripts used by Mozilla's addons packages
  This package contains mozilla-devscripts, a collection of scripts
  based on Makefile inheritance meant for packaging Firefox's and
