@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright (c) 2009-2011, Benjamin Drung <bdrung@debian.org>
 #
@@ -35,21 +35,21 @@ def moz_version_compare(version1, comparator, version2, silent=False,
        otherwise false"""
     if comparator not in COMPARATORS:
         if not silent:
-            print >> sys.stderr, "E: The comparator " + comparator + \
+            print("E: The comparator " + comparator + \
                                  " is not valid. It should one of " + \
-                                 ", ".join(COMPARATORS) + "."
+                                 ", ".join(COMPARATORS) + ".", file=sys.stderr)
         sys.exit(INVALID_COMPARATOR)
 
     if version1.strip() == "" or version2.strip() == "":
         if not silent:
-            print >> sys.stderr, "E: At least one version string is empty."
+            print("E: At least one version string is empty.", file=sys.stderr)
         sys.exit(EMPTY_VERSION_STRING)
 
     if verbose:
         symbol = {"lt": "<", "le": "<=", "eq": "=", "ne": "!=",
                   "ge": ">=", "gt": ">"}
-        print "I: Comparing %s %s %s." % \
-              (version1, symbol[comparator], version2)
+        print("I: Comparing %s %s %s." % \
+              (version1, symbol[comparator], version2))
 
     if comparator == "lt":
         return compare_versions(version1, version2, verbose) < 0
@@ -68,7 +68,7 @@ def moz_version_compare(version1, comparator, version2, silent=False,
 
 def usage(output):
     name = os.path.basename(sys.argv[0])
-    print >> output, """Usage: %s [options] action
+    print("""Usage: %s [options] action
 
 Actions:
   -c, --compare version1 comparator version2
@@ -82,16 +82,16 @@ Options:
   -s, --silent             do not print anything and die silent on errors
   -v, --verbose            print more information
 
-See %s(1) for more info.""" % (name, ", ".join(COMPARATORS), name)
+See %s(1) for more info.""" % (name, ", ".join(COMPARATORS), name))
 
 
 def main():
     try:
         long_opts = ["compare", "help", "silent", "to-deb", "to-moz", "verbose"]
         opts, args = getopt.gnu_getopt(sys.argv[1:], "cdhmsv", long_opts)
-    except getopt.GetoptError, e:
+    except getopt.GetoptError as e:
         # print help information and exit:
-        print >> sys.stderr, str(e)
+        print(e, file=sys.stderr)
         usage(sys.stderr)
         sys.exit(COMMAND_LINE_SYNTAX_ERROR)
 
@@ -118,7 +118,7 @@ def main():
 
     if len(actions) != 1:
         if not silent:
-            print >> sys.stderr, "E: You must specify an action."
+            print("E: You must specify an action.", file=sys.stderr)
             usage(sys.stderr)
         sys.exit(COMMAND_LINE_SYNTAX_ERROR)
 
@@ -131,26 +131,26 @@ def main():
             sys.exit(COMMAND_LINE_SYNTAX_ERROR)
         if moz_version_compare(args[0], args[1], args[2], silent, verbose):
             if verbose:
-                print "I: Compare expression true."
+                print("I: Compare expression true.")
             sys.exit(0)
         else:
             if verbose:
-                print "I: Compare expression false."
+                print("I: Compare expression false.")
             sys.exit(1)
     elif action == "to-deb":
         if len(args) != 1:
             if not silent:
-                print >> sys.stderr, "E: The action --to-deb takes exactly " + \
-                                     "one argument."
+                print("E: The action --to-deb takes exactly " + \
+                                     "one argument.", file=sys.stderr)
             sys.exit(COMMAND_LINE_SYNTAX_ERROR)
-        print convert_moz_to_debian_version(args[0], 0, verbose)
+        print(convert_moz_to_debian_version(args[0], 0, verbose))
     elif action == "to-moz":
         if len(args) != 1:
             if not silent:
-                print >> sys.stderr, "E: The action --to-moz takes exactly " + \
-                                     "one argument."
+                print("E: The action --to-moz takes exactly " + \
+                                     "one argument.", file=sys.stderr)
             sys.exit(COMMAND_LINE_SYNTAX_ERROR)
-        print convert_debian_to_moz_version(args[0])
+        print(convert_debian_to_moz_version(args[0]))
 
 if __name__ == "__main__":
     main()

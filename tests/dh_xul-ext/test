@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright (c) 2011, Benjamin Drung <bdrung@debian.org>
 #
@@ -33,7 +33,7 @@ def escape_arg(arg):
 
 
 def fail(message):
-    print >> sys.stderr, "dh_xul-ext test error: " + message
+    print("dh_xul-ext test error: " + message, file=sys.stderr)
     sys.exit(1)
 
 
@@ -74,10 +74,10 @@ def main():
     for test in TESTS:
         try:
             test_dh_xul_ext(test)
-        except TestError, error:
+        except TestError as error:
             errors += 1
-            print >> sys.stderr, "dh_xul-ext error in " + test + " test: " + \
-                                 str(error)
+            print("dh_xul-ext error in " + test + " test: " + \
+                                 error, file=sys.stderr)
     if errors > 0:
         sys.exit(1)
 
